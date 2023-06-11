@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+      crossorigin="anonymous"
+    />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+
+    <script>
+      function apiTokenGet(){
+        let authKey = $('#authKey').val();
+        let authKeyId = $('#authKeyId').val();
+        localStorage.setItem('authKey', authKey)
+        localStorage.setItem('authKeyId', authKeyId)
+
+        let formData = new FormData()
+        formData.append("authKey", authKey)
+        formData.append("authKeyId", authKeyId)
+        fetch('/auth', { method: "POST", body: formData }).then(res => res.json()).then(data => {
+          //let apiKey = data['apiKey']
+          localStorage.setItem('apiKey', data['apiKey']) //store to localStorage
+          localStorage.setItem('token', data['token']) //store to localStorage
+          let temp_html = `<p>${data['msg']}</p>`
+          $('#api_result').empty();
+          $('#api_result').append(temp_html);
+        })
+      }
+
+      function deviceListGet(){
+        let formData = new FormData()
+        formData.append("apiKey", localStorage.getItem('apiKey'))//store to localStorage
+        formData.append("token", localStorage.getItem('token'))//store to localStorage
+
+        $('#deviceList').find('tr').slice(1).remove()
+
+        fetch('/deviceList', { method: "POST", body: formData }).then(res => res.json()).then(data => {
+          let rowData = data
+          rowData.forEach((a) => {
+            let deviceName = a['name']
+            let deviceType = a['productDisplayName']
+            let deviceId = a['deviceId']
+            let session_status = a['connected']
+
+            let temp_html = `<tr>
+                <td>${deviceName}</td>
+                <td>${deviceType}</td>
+                <td>${deviceId}</td>
+                <td>${session_status}</td>
+              </tr>`
+            $('#deviceList').append(temp_html)
+
+            let temp_deviceList_html = `
+            <option value=${deviceId}>${deviceName}(${deviceId})</option>
+            `
+            $('#deviceSelect').append(temp_deviceList_html)
+          })
+          })
+      }
+
+      async function liveStreaming(){
+        var manifestUrl = "";
+        let selected_deviceId = $('#deviceSelect option:selected').val()
+        //console.log(selected_deviceId)
+
+        let formData = new FormData()
+        formData.append("apiKey", localStorage.getItem('apiKey'))
+        formData.append("token", localStorage.getItem('token'))
+        formData.append("deviceId", selected_deviceId)
+        
+        let url
+
+        const response = await fetch('/liveStream', { method: "POST", body: formData })
+        const rowData = await response.json()
+          console.log(rowData)
+          url = rowData.playList[0].url;
+          console.log(url)
+          //localStorage.setItem('mpd_url', url)
+
+        const videoPlayer = dashjs.MediaPlayer().create();
+        const videoElement = document.getElementById('videoPlayer');  
+
+        // MPEG-DASH形式のURL配列
+        const streamURL = url
+  
+
+        // ビデオ要素にMPEG-DASHストリームを関連付ける
+        videoPlayer.initialize(videoElement, streamURL, true);
+
+        // ストリームの再生
+        const timer = videoPlayer.play();
+        setTimeout(timer, 10000)
+        
+      }
+
+      async function getImage(){
+        let selected_deviceId = $('#deviceSelect option:selected').val()
+        let formData = new FormData()
+        let picture_url
+        formData.append("apiKey", localStorage.getItem('apiKey'))
+        formData.append("token", localStorage.getItem('token'))
+        formData.append("deviceId", selected_deviceId)
+        const response = await fetch('/getImage', { method: "POST", body: formData })
+        const rowData = await response.json()
+        picture_url = await rowData[0].eventInfo.atomEventV1.picture;
+        let temp_img_html = `<image src="${picture_url}" alt="Image" id="event-image-size">`
+      
+        $('#event-image').empty()
+        $('#event-image').append(temp_img_html)
+      }
+
+    </script>
+
+    <style>
+      * {
+        font-family: "Gowun Dodum", sans-serif;
+      }
+
+      .input-group{
+        margin:20px 20px 0px 20px;
+        width:70%;
+        font-size: smaller;
+      }
+
+      .btn{
+        margin:20px;
+      }
+
+      #api_result {
+        margin-left:20px;
+        color:black;
+      }
+
+      .table {
+        width: 70%;
+        margin:20px;
+        font-size: smaller;
+      }
+
+      .select{
+        width:70%;
+        margin:20px;
+        font-size: smaller;
+      }
+
+      #videoPlayer{
+        width: 70%;
+        aspect-ratio: 16/9;
+        margin:20px;
+      }
+
+      #event-image-size{
+        margin: 20px;
+        width:70%;
+        aspect-ratio: 16/9;
+        box-sizing: border-box;
+      }
+
+      .description{
+        margin:20px;
+        margin-top: 10px;
+      }
+
+    </style>
+
+    <title>Cloud Camera UserConsole</title>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light" style="background-color:aquamarine;">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">Cloud Camera User Console</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link active" aria-current="page" href="#">Home</a>
+            </li>
+            <!-- <li class="nav-item">
+              <a class="nav-link" href="#">Link</a>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Dropdown
+              </a>
+              <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <li><a class="dropdown-item" href="#">Action</a></li>
+                <li><a class="dropdown-item" href="#">Another action</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#">Something else here</a></li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>
+            </li>
+          </ul>
+          <form class="d-flex">
+            <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+            <button class="btn btn-outline-success" type="submit">Search</button>
+          </form> -->
+        </div>
+      </div>
+    </nav>
+    <div>
+      <div class="input-group mb-3">
+        <span class="input-group-text input-form" >認証キー</span>
+        <input
+          type="password"
+          class="form-control"
+          aria-label="Sizing example input"
+          aria-describedby="inputGroup-sizing-default"
+          id="authKey"
+        />
+      </div>
+      <div class="input-group mb-3">
+        <span class="input-group-text input-form" >認証ID
+        </span>
+        <input
+          type="password"
+          class="form-control"
+          aria-label="Sizing example input"
+          aria-describedby="inputGroup-sizing-default"
+          id="authKeyId"
+        />
+      </div>
+      <div>
+        <button class="btn btn-primary" type="submit" onclick="apiTokenGet()">APIトークンを取得する</button>
+        <p id="api_result"></p> <!--display response message.-->
+      </div>
+    <div>
+    <div>
+      <button class="btn btn-primary" type="submit" onclick="deviceListGet()">デバイス一覧を取得する</button>
+      <table class="table table-striped" id="deviceList">
+        <tr>
+          <th>デバイス名称</th>
+          <th>デバイス機種</th>
+          <th>デバイスID</th>
+          <th>接続ステータス</th>
+        </tr>
+      </table>
+      <select class="form-select form-select-lg mb-3 select" aria-label=".form-select-lg example" id="deviceSelect">
+        <option selected>カメラを選択してください。</option>
+      </select>
+    </div>
+    <div>
+      <button class="btn btn-primary" type="submit" onclick="liveStreaming()">ライブ映像を視聴する</button>
+    </div>
+    <div>
+      <video id="videoPlayer" controls autoplay></video>
+    </div>
+  </div>
+  <div>
+    <button class="btn btn-primary" type="submit" onclick="getImage()">静止画を表示する</button>
+    <p class="description">カメラがイベント検知した最新の静止画が１枚表示されます。表示されるまで数秒かかります。</p>
+    <div id="event-image"></div>
+  </div>
+
+  </body>
+</html>
